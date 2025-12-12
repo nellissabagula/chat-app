@@ -1,155 +1,70 @@
 {
-    "name": "@types/node",
-    "version": "24.10.1",
-    "description": "TypeScript definitions for node",
-    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node",
-    "license": "MIT",
-    "contributors": [
-        {
-            "name": "Microsoft TypeScript",
-            "githubUsername": "Microsoft",
-            "url": "https://github.com/Microsoft"
-        },
-        {
-            "name": "Alberto Schiabel",
-            "githubUsername": "jkomyno",
-            "url": "https://github.com/jkomyno"
-        },
-        {
-            "name": "Andrew Makarov",
-            "githubUsername": "r3nya",
-            "url": "https://github.com/r3nya"
-        },
-        {
-            "name": "Benjamin Toueg",
-            "githubUsername": "btoueg",
-            "url": "https://github.com/btoueg"
-        },
-        {
-            "name": "David Junger",
-            "githubUsername": "touffy",
-            "url": "https://github.com/touffy"
-        },
-        {
-            "name": "Mohsen Azimi",
-            "githubUsername": "mohsen1",
-            "url": "https://github.com/mohsen1"
-        },
-        {
-            "name": "Nikita Galkin",
-            "githubUsername": "galkin",
-            "url": "https://github.com/galkin"
-        },
-        {
-            "name": "Sebastian Silbermann",
-            "githubUsername": "eps1lon",
-            "url": "https://github.com/eps1lon"
-        },
-        {
-            "name": "Wilco Bakker",
-            "githubUsername": "WilcoBakker",
-            "url": "https://github.com/WilcoBakker"
-        },
-        {
-            "name": "Marcin Kopacz",
-            "githubUsername": "chyzwar",
-            "url": "https://github.com/chyzwar"
-        },
-        {
-            "name": "Trivikram Kamat",
-            "githubUsername": "trivikr",
-            "url": "https://github.com/trivikr"
-        },
-        {
-            "name": "Junxiao Shi",
-            "githubUsername": "yoursunny",
-            "url": "https://github.com/yoursunny"
-        },
-        {
-            "name": "Ilia Baryshnikov",
-            "githubUsername": "qwelias",
-            "url": "https://github.com/qwelias"
-        },
-        {
-            "name": "ExE Boss",
-            "githubUsername": "ExE-Boss",
-            "url": "https://github.com/ExE-Boss"
-        },
-        {
-            "name": "Piotr Błażejewicz",
-            "githubUsername": "peterblazejewicz",
-            "url": "https://github.com/peterblazejewicz"
-        },
-        {
-            "name": "Anna Henningsen",
-            "githubUsername": "addaleax",
-            "url": "https://github.com/addaleax"
-        },
-        {
-            "name": "Victor Perin",
-            "githubUsername": "victorperin",
-            "url": "https://github.com/victorperin"
-        },
-        {
-            "name": "NodeJS Contributors",
-            "githubUsername": "NodeJS",
-            "url": "https://github.com/NodeJS"
-        },
-        {
-            "name": "Linus Unnebäck",
-            "githubUsername": "LinusU",
-            "url": "https://github.com/LinusU"
-        },
-        {
-            "name": "wafuwafu13",
-            "githubUsername": "wafuwafu13",
-            "url": "https://github.com/wafuwafu13"
-        },
-        {
-            "name": "Matteo Collina",
-            "githubUsername": "mcollina",
-            "url": "https://github.com/mcollina"
-        },
-        {
-            "name": "Dmitry Semigradsky",
-            "githubUsername": "Semigradsky",
-            "url": "https://github.com/Semigradsky"
-        },
-        {
-            "name": "René",
-            "githubUsername": "Renegade334",
-            "url": "https://github.com/Renegade334"
-        },
-        {
-            "name": "Yagiz Nizipli",
-            "githubUsername": "anonrig",
-            "url": "https://github.com/anonrig"
-        }
-    ],
-    "main": "",
-    "types": "index.d.ts",
-    "typesVersions": {
-        "<=5.6": {
-            "*": [
-                "ts5.6/*"
-            ]
-        },
-        "<=5.7": {
-            "*": [
-                "ts5.7/*"
-            ]
-        }
+  "name": "engine.io",
+  "version": "6.6.4",
+  "description": "The realtime engine behind Socket.IO. Provides the foundation of a bidirectional connection between client and server",
+  "type": "commonjs",
+  "main": "./build/engine.io.js",
+  "types": "./build/engine.io.d.ts",
+  "exports": {
+    "types": "./build/engine.io.d.ts",
+    "import": "./wrapper.mjs",
+    "require": "./build/engine.io.js"
+  },
+  "author": "Guillermo Rauch <guillermo@learnboost.com>",
+  "contributors": [
+    {
+      "name": "Eugen Dueck",
+      "web": "https://github.com/EugenDueck"
     },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
-        "directory": "types/node"
+    {
+      "name": "Afshin Mehrabani",
+      "web": "https://github.com/afshinm"
     },
-    "scripts": {},
-    "dependencies": {
-        "undici-types": "~7.16.0"
+    {
+      "name": "Christoph Dorn",
+      "web": "https://github.com/cadorn"
     },
-    "peerDependencies": {},
-    "typesPublisherContentHash": "bf541e42e173a984f57b649839d3371001c98469b0e8944f7762074aed2acd2f",
-    "typeScriptVersion": "5.2"
+    {
+      "name": "Mark Mokryn",
+      "email": "mokesmokes@gmail.com"
+    }
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@types/cors": "^2.8.12",
+    "@types/node": ">=10.0.0",
+    "accepts": "~1.3.4",
+    "base64id": "2.0.0",
+    "cookie": "~0.7.2",
+    "cors": "~2.8.5",
+    "debug": "~4.3.1",
+    "engine.io-parser": "~5.2.1",
+    "ws": "~8.17.1"
+  },
+  "scripts": {
+    "compile": "rimraf ./build && tsc",
+    "test": "npm run compile && npm run format:check && npm run test:default && npm run test:compat-v3",
+    "test:default": "mocha --bail --exit",
+    "test:compat-v3": "EIO_CLIENT=3 mocha --exit",
+    "test:eiows": "EIO_WS_ENGINE=eiows mocha --exit",
+    "test:uws": "EIO_WS_ENGINE=uws mocha --exit",
+    "format:check": "prettier --check \"wrapper.mjs\" \"lib/**/*.ts\" \"test/**/*.js\" \"test/webtransport.mjs\"",
+    "format:fix": "prettier --write \"wrapper.mjs\" \"lib/**/*.ts\" \"test/**/*.js\" \"test/webtransport.mjs\"",
+    "prepack": "npm run compile"
+  },
+  "homepage": "https://github.com/socketio/socket.io/tree/main/packages/engine.io#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/socketio/socket.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/socketio/socket.io/issues"
+  },
+  "files": [
+    "build/",
+    "wrapper.mjs"
+  ],
+  "engines": {
+    "node": ">=10.2.0"
+  }
 }

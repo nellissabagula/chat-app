@@ -1,104 +1,60 @@
-'use strict';
+/*!
+ * encodeurl
+ * Copyright(c) 2016 Douglas Christopher Wilson
+ * MIT Licensed
+ */
 
-Object.defineProperty(exports, "__esModule", { value: true });
-
-const picomatch = require('picomatch');
-const normalizePath = require('normalize-path');
+'use strict'
 
 /**
- * @typedef {(testString: string) => boolean} AnymatchFn
- * @typedef {string|RegExp|AnymatchFn} AnymatchPattern
- * @typedef {AnymatchPattern|AnymatchPattern[]} AnymatchMatcher
+ * Module exports.
+ * @public
  */
-const BANG = '!';
-const DEFAULT_OPTIONS = {returnIndex: false};
-const arrify = (item) => Array.isArray(item) ? item : [item];
+
+module.exports = encodeUrl
 
 /**
- * @param {AnymatchPattern} matcher
- * @param {object} options
- * @returns {AnymatchFn}
+ * RegExp to match non-URL code points, *after* encoding (i.e. not including "%")
+ * and including invalid escape sequences.
+ * @private
  */
-const createPattern = (matcher, options) => {
-  if (typeof matcher === 'function') {
-    return matcher;
-  }
-  if (typeof matcher === 'string') {
-    const glob = picomatch(matcher, options);
-    return (string) => matcher === string || glob(string);
-  }
-  if (matcher instanceof RegExp) {
-    return (string) => matcher.test(string);
-  }
-  return (string) => false;
-};
+
+var ENCODE_CHARS_REGEXP = /(?:[^\x21\x23-\x3B\x3D\x3F-\x5F\x61-\x7A\x7C\x7E]|%(?:[^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|$))+/g
 
 /**
- * @param {Array<Function>} patterns
- * @param {Array<Function>} negPatterns
- * @param {String|Array} args
- * @param {Boolean} returnIndex
- * @returns {boolean|number}
+ * RegExp to match unmatched surrogate pair.
+ * @private
  */
-const matchPatterns = (patterns, negPatterns, args, returnIndex) => {
-  const isList = Array.isArray(args);
-  const _path = isList ? args[0] : args;
-  if (!isList && typeof _path !== 'string') {
-    throw new TypeError('anymatch: second argument must be a string: got ' +
-      Object.prototype.toString.call(_path))
-  }
-  const path = normalizePath(_path, false);
 
-  for (let index = 0; index < negPatterns.length; index++) {
-    const nglob = negPatterns[index];
-    if (nglob(path)) {
-      return returnIndex ? -1 : false;
-    }
-  }
-
-  const applied = isList && [path].concat(args.slice(1));
-  for (let index = 0; index < patterns.length; index++) {
-    const pattern = patterns[index];
-    if (isList ? pattern(...applied) : pattern(path)) {
-      return returnIndex ? index : true;
-    }
-  }
-
-  return returnIndex ? -1 : false;
-};
+var UNMATCHED_SURROGATE_PAIR_REGEXP = /(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uD800-\uDBFF]([^\uDC00-\uDFFF]|$)/g
 
 /**
- * @param {AnymatchMatcher} matchers
- * @param {Array|string} testString
- * @param {object} options
- * @returns {boolean|number|Function}
+ * String to replace unmatched surrogate pair with.
+ * @private
  */
-const anymatch = (matchers, testString, options = DEFAULT_OPTIONS) => {
-  if (matchers == null) {
-    throw new TypeError('anymatch: specify first argument');
-  }
-  const opts = typeof options === 'boolean' ? {returnIndex: options} : options;
-  const returnIndex = opts.returnIndex || false;
 
-  // Early cache for matchers.
-  const mtchers = arrify(matchers);
-  const negatedGlobs = mtchers
-    .filter(item => typeof item === 'string' && item.charAt(0) === BANG)
-    .map(item => item.slice(1))
-    .map(item => picomatch(item, opts));
-  const patterns = mtchers
-    .filter(item => typeof item !== 'string' || (typeof item === 'string' && item.charAt(0) !== BANG))
-    .map(matcher => createPattern(matcher, opts));
+var UNMATCHED_SURROGATE_PAIR_REPLACE = '$1\uFFFD$2'
 
-  if (testString == null) {
-    return (testString, ri = false) => {
-      const returnIndex = typeof ri === 'boolean' ? ri : false;
-      return matchPatterns(patterns, negatedGlobs, testString, returnIndex);
-    }
-  }
+/**
+ * Encode a URL to a percent-encoded form, excluding already-encoded sequences.
+ *
+ * This function will take an already-encoded URL and encode all the non-URL
+ * code points. This function will not encode the "%" character unless it is
+ * not part of a valid sequence (`%20` will be left as-is, but `%foo` will
+ * be encoded as `%25foo`).
+ *
+ * This encode is meant to be "safe" and does not throw errors. It will try as
+ * hard as it can to properly encode the given URL, including replacing any raw,
+ * unpaired surrogate pairs with the Unicode replacement character prior to
+ * encoding.
+ *
+ * @param {string} url
+ * @return {string}
+ * @public
+ */
 
-  return matchPatterns(patterns, negatedGlobs, testString, returnIndex);
-};
-
-anymatch.default = anymatch;
-module.exports = anymatch;
+function encodeUrl (url) {
+  return String(url)
+    .replace(UNMATCHED_SURROGATE_PAIR_REGEXP, UNMATCHED_SURROGATE_PAIR_REPLACE)
+    .replace(ENCODE_CHARS_REGEXP, encodeURI)
+}
