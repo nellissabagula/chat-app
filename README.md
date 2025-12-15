@@ -1,127 +1,122 @@
-# normalize-path [![NPM version](https://img.shields.io/npm/v/normalize-path.svg?style=flat)](https://www.npmjs.com/package/normalize-path) [![NPM monthly downloads](https://img.shields.io/npm/dm/normalize-path.svg?style=flat)](https://npmjs.org/package/normalize-path) [![NPM total downloads](https://img.shields.io/npm/dt/normalize-path.svg?style=flat)](https://npmjs.org/package/normalize-path) [![Linux Build Status](https://img.shields.io/travis/jonschlinkert/normalize-path.svg?style=flat&label=Travis)](https://travis-ci.org/jonschlinkert/normalize-path)
+# readdirp [![Weekly downloads](https://img.shields.io/npm/dw/readdirp.svg)](https://github.com/paulmillr/readdirp)
 
-> Normalize slashes in a file path to be posix/unix-like forward slashes. Also condenses repeat slashes to a single slash and removes and trailing slashes, unless disabled.
+Recursive version of [fs.readdir](https://nodejs.org/api/fs.html#fs_fs_readdir_path_options_callback). Exposes a **stream API** and a **promise API**.
 
-Please consider following this project's author, [Jon Schlinkert](https://github.com/jonschlinkert), and consider starring the project to show your :heart: and support.
-
-## Install
-
-Install with [npm](https://www.npmjs.com/):
 
 ```sh
-$ npm install --save normalize-path
+npm install readdirp
 ```
 
-## Usage
+```javascript
+const readdirp = require('readdirp');
 
-```js
-const normalize = require('normalize-path');
+// Use streams to achieve small RAM & CPU footprint.
+// 1) Streams example with for-await.
+for await (const entry of readdirp('.')) {
+  const {path} = entry;
+  console.log(`${JSON.stringify({path})}`);
+}
 
-console.log(normalize('\\foo\\bar\\baz\\')); 
-//=> '/foo/bar/baz'
+// 2) Streams example, non for-await.
+// Print out all JS files along with their size within the current folder & subfolders.
+readdirp('.', {fileFilter: '*.js', alwaysStat: true})
+  .on('data', (entry) => {
+    const {path, stats: {size}} = entry;
+    console.log(`${JSON.stringify({path, size})}`);
+  })
+  // Optionally call stream.destroy() in `warn()` in order to abort and cause 'close' to be emitted
+  .on('warn', error => console.error('non-fatal error', error))
+  .on('error', error => console.error('fatal error', error))
+  .on('end', () => console.log('done'));
+
+// 3) Promise example. More RAM and CPU than streams / for-await.
+const files = await readdirp.promise('.');
+console.log(files.map(file => file.path));
+
+// Other options.
+readdirp('test', {
+  fileFilter: '*.js',
+  directoryFilter: ['!.git', '!*modules']
+  // directoryFilter: (di) => di.basename.length === 9
+  type: 'files_directories',
+  depth: 1
+});
 ```
 
-**win32 namespaces**
+For more examples, check out `examples` directory.
 
-```js
-console.log(normalize('\\\\?\\UNC\\Server01\\user\\docs\\Letter.txt')); 
-//=> '//?/UNC/Server01/user/docs/Letter.txt'
+## API
 
-console.log(normalize('\\\\.\\CdRomX')); 
-//=> '//./CdRomX'
-```
+`const stream = readdirp(root[, options])` — **Stream API**
 
-**Consecutive slashes**
+- Reads given root recursively and returns a `stream` of [entry infos](#entryinfo)
+- Optionally can be used like `for await (const entry of stream)` with node.js 10+ (`asyncIterator`).
+- `on('data', (entry) => {})` [entry info](#entryinfo) for every file / dir.
+- `on('warn', (error) => {})` non-fatal `Error` that prevents a file / dir from being processed. Example: inaccessible to the user.
+- `on('error', (error) => {})` fatal `Error` which also ends the stream. Example: illegal options where passed.
+- `on('end')` — we are done. Called when all entries were found and no more will be emitted.
+- `on('close')` — stream is destroyed via `stream.destroy()`.
+  Could be useful if you want to manually abort even on a non fatal error.
+  At that point the stream is no longer `readable` and no more entries, warning or errors are emitted
+- To learn more about streams, consult the very detailed [nodejs streams documentation](https://nodejs.org/api/stream.html)
+  or the [stream-handbook](https://github.com/substack/stream-handbook)
 
-Condenses multiple consecutive forward slashes (except for leading slashes in win32 namespaces) to a single slash.
+`const entries = await readdirp.promise(root[, options])` — **Promise API**. Returns a list of [entry infos](#entryinfo).
 
-```js
-console.log(normalize('.//foo//bar///////baz/')); 
-//=> './foo/bar/baz'
-```
+First argument is awalys `root`, path in which to start reading and recursing into subdirectories.
 
-### Trailing slashes
+### options
 
-By default trailing slashes are removed. Pass `false` as the last argument to disable this behavior and _**keep** trailing slashes_:
+- `fileFilter: ["*.js"]`: filter to include or exclude files. A `Function`, Glob string or Array of glob strings.
+    - **Function**: a function that takes an entry info as a parameter and returns true to include or false to exclude the entry
+    - **Glob string**: a string (e.g., `*.js`) which is matched using [picomatch](https://github.com/micromatch/picomatch), so go there for more
+        information. Globstars (`**`) are not supported since specifying a recursive pattern for an already recursive function doesn't make sense. Negated globs (as explained in the minimatch documentation) are allowed, e.g., `!*.txt` matches everything but text files.
+    - **Array of glob strings**: either need to be all inclusive or all exclusive (negated) patterns otherwise an error is thrown.
+        `['*.json', '*.js']` includes all JavaScript and Json files.
+        `['!.git', '!node_modules']` includes all directories except the '.git' and 'node_modules'.
+    - Directories that do not pass a filter will not be recursed into.
+- `directoryFilter: ['!.git']`: filter to include/exclude directories found and to recurse into. Directories that do not pass a filter will not be recursed into.
+- `depth: 5`: depth at which to stop recursing even if more subdirectories are found
+- `type: 'files'`: determines if data events on the stream should be emitted for `'files'` (default), `'directories'`, `'files_directories'`, or `'all'`. Setting to `'all'` will also include entries for other types of file descriptors like character devices, unix sockets and named pipes.
+- `alwaysStat: false`: always return `stats` property for every file. Default is `false`, readdirp will return `Dirent` entries. Setting it to `true` can double readdir execution time - use it only when you need file `size`, `mtime` etc. Cannot be enabled on node <10.10.0.
+- `lstat: false`: include symlink entries in the stream along with files. When `true`, `fs.lstat` would be used instead of `fs.stat`
 
-```js
-console.log(normalize('foo\\bar\\baz\\', false)); //=> 'foo/bar/baz/'
-console.log(normalize('./foo/bar/baz/', false)); //=> './foo/bar/baz/'
-```
+### `EntryInfo`
 
-## Release history
+Has the following properties:
 
-### v3.0
+- `path: 'assets/javascripts/react.js'`: path to the file/directory (relative to given root)
+- `fullPath: '/Users/dev/projects/app/assets/javascripts/react.js'`: full path to the file/directory found
+- `basename: 'react.js'`: name of the file/directory
+- `dirent: fs.Dirent`: built-in [dir entry object](https://nodejs.org/api/fs.html#fs_class_fs_dirent) - only with `alwaysStat: false`
+- `stats: fs.Stats`: built in [stat object](https://nodejs.org/api/fs.html#fs_class_fs_stats) - only with `alwaysStat: true`
 
-No breaking changes in this release.
+## Changelog
 
-* a check was added to ensure that [win32 namespaces](https://msdn.microsoft.com/library/windows/desktop/aa365247(v=vs.85).aspx#namespaces) are handled properly by win32 `path.parse()` after a path has been normalized by this library.
-* a minor optimization was made to simplify how the trailing separator was handled
+- 3.5 (Oct 13, 2020) disallows recursive directory-based symlinks.
+  Before, it could have entered infinite loop.
+- 3.4 (Mar 19, 2020) adds support for directory-based symlinks.
+- 3.3 (Dec 6, 2019) stabilizes RAM consumption and enables perf management with `highWaterMark` option. Fixes race conditions related to `for-await` looping.
+- 3.2 (Oct 14, 2019) improves performance by 250% and makes streams implementation more idiomatic.
+- 3.1 (Jul 7, 2019) brings `bigint` support to `stat` output on Windows. This is backwards-incompatible for some cases. Be careful. It you use it incorrectly, you'll see "TypeError: Cannot mix BigInt and other types, use explicit conversions".
+- 3.0 brings huge performance improvements and stream backpressure support.
+- Upgrading 2.x to 3.x:
+    - Signature changed from `readdirp(options)` to `readdirp(root, options)`
+    - Replaced callback API with promise API.
+    - Renamed `entryType` option to `type`
+    - Renamed `entryType: 'both'` to `'files_directories'`
+    - `EntryInfo`
+        - Renamed `stat` to `stats`
+            - Emitted only when `alwaysStat: true`
+            - `dirent` is emitted instead of `stats` by default with `alwaysStat: false`
+        - Renamed `name` to `basename`
+        - Removed `parentDir` and `fullParentDir` properties
+- Supported node.js versions:
+    - 3.x: node 8+
+    - 2.x: node 0.6+
 
-## About
+## License
 
-<details>
-<summary><strong>Contributing</strong></summary>
+Copyright (c) 2012-2019 Thorsten Lorenz, Paul Miller (<https://paulmillr.com>)
 
-Pull requests and stars are always welcome. For bugs and feature requests, [please create an issue](../../issues/new).
-
-</details>
-
-<details>
-<summary><strong>Running Tests</strong></summary>
-
-Running and reviewing unit tests is a great way to get familiarized with a library and its API. You can install dependencies and run tests with the following command:
-
-```sh
-$ npm install && npm test
-```
-
-</details>
-
-<details>
-<summary><strong>Building docs</strong></summary>
-
-_(This project's readme.md is generated by [verb](https://github.com/verbose/verb-generate-readme), please don't edit the readme directly. Any changes to the readme must be made in the [.verb.md](.verb.md) readme template.)_
-
-To generate the readme, run the following command:
-
-```sh
-$ npm install -g verbose/verb#dev verb-generate-readme && verb
-```
-
-</details>
-
-### Related projects
-
-Other useful path-related libraries:
-
-* [contains-path](https://www.npmjs.com/package/contains-path): Return true if a file path contains the given path. | [homepage](https://github.com/jonschlinkert/contains-path "Return true if a file path contains the given path.")
-* [is-absolute](https://www.npmjs.com/package/is-absolute): Returns true if a file path is absolute. Does not rely on the path module… [more](https://github.com/jonschlinkert/is-absolute) | [homepage](https://github.com/jonschlinkert/is-absolute "Returns true if a file path is absolute. Does not rely on the path module and can be used as a polyfill for node.js native `path.isAbolute`.")
-* [is-relative](https://www.npmjs.com/package/is-relative): Returns `true` if the path appears to be relative. | [homepage](https://github.com/jonschlinkert/is-relative "Returns `true` if the path appears to be relative.")
-* [parse-filepath](https://www.npmjs.com/package/parse-filepath): Pollyfill for node.js `path.parse`, parses a filepath into an object. | [homepage](https://github.com/jonschlinkert/parse-filepath "Pollyfill for node.js `path.parse`, parses a filepath into an object.")
-* [path-ends-with](https://www.npmjs.com/package/path-ends-with): Return `true` if a file path ends with the given string/suffix. | [homepage](https://github.com/jonschlinkert/path-ends-with "Return `true` if a file path ends with the given string/suffix.")
-* [unixify](https://www.npmjs.com/package/unixify): Convert Windows file paths to unix paths. | [homepage](https://github.com/jonschlinkert/unixify "Convert Windows file paths to unix paths.")
-
-### Contributors
-
-| **Commits** | **Contributor** | 
-| --- | --- |
-| 35 | [jonschlinkert](https://github.com/jonschlinkert) |
-| 1 | [phated](https://github.com/phated) |
-
-### Author
-
-**Jon Schlinkert**
-
-* [LinkedIn Profile](https://linkedin.com/in/jonschlinkert)
-* [GitHub Profile](https://github.com/jonschlinkert)
-* [Twitter Profile](https://twitter.com/jonschlinkert)
-
-### License
-
-Copyright © 2018, [Jon Schlinkert](https://github.com/jonschlinkert).
-Released under the [MIT License](LICENSE).
-
-***
-
-_This file was generated by [verb-generate-readme](https://github.com/verbose/verb-generate-readme), v0.6.0, on April 19, 2018._
+MIT License, see [LICENSE](LICENSE) file.
