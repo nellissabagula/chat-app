@@ -1,90 +1,80 @@
-import { Emitter } from "@socket.io/component-emitter";
-/**
- * Protocol version.
- *
- * @public
- */
-export declare const protocol: number;
-export declare enum PacketType {
-    CONNECT = 0,
-    DISCONNECT = 1,
-    EVENT = 2,
-    ACK = 3,
-    CONNECT_ERROR = 4,
-    BINARY_EVENT = 5,
-    BINARY_ACK = 6
+import Dispatcher from './dispatcher'
+import { setGlobalDispatcher, getGlobalDispatcher } from './global-dispatcher'
+import { setGlobalOrigin, getGlobalOrigin } from './global-origin'
+import Pool from './pool'
+import { RedirectHandler, DecoratorHandler } from './handlers'
+
+import BalancedPool from './balanced-pool'
+import Client from './client'
+import H2CClient from './h2c-client'
+import buildConnector from './connector'
+import errors from './errors'
+import Agent from './agent'
+import MockClient from './mock-client'
+import MockPool from './mock-pool'
+import MockAgent from './mock-agent'
+import { SnapshotAgent } from './snapshot-agent'
+import { MockCallHistory, MockCallHistoryLog } from './mock-call-history'
+import mockErrors from './mock-errors'
+import ProxyAgent from './proxy-agent'
+import EnvHttpProxyAgent from './env-http-proxy-agent'
+import RetryHandler from './retry-handler'
+import RetryAgent from './retry-agent'
+import { request, pipeline, stream, connect, upgrade } from './api'
+import interceptors from './interceptors'
+
+export * from './util'
+export * from './cookies'
+export * from './eventsource'
+export * from './fetch'
+export * from './formdata'
+export * from './diagnostics-channel'
+export * from './websocket'
+export * from './content-type'
+export * from './cache'
+export { Interceptable } from './mock-interceptor'
+
+declare function globalThisInstall (): void
+
+export { Dispatcher, BalancedPool, Pool, Client, buildConnector, errors, Agent, request, stream, pipeline, connect, upgrade, setGlobalDispatcher, getGlobalDispatcher, setGlobalOrigin, getGlobalOrigin, interceptors, MockClient, MockPool, MockAgent, SnapshotAgent, MockCallHistory, MockCallHistoryLog, mockErrors, ProxyAgent, EnvHttpProxyAgent, RedirectHandler, DecoratorHandler, RetryHandler, RetryAgent, H2CClient, globalThisInstall as install }
+export default Undici
+
+declare namespace Undici {
+  const Dispatcher: typeof import('./dispatcher').default
+  const Pool: typeof import('./pool').default
+  const RedirectHandler: typeof import ('./handlers').RedirectHandler
+  const DecoratorHandler: typeof import ('./handlers').DecoratorHandler
+  const RetryHandler: typeof import ('./retry-handler').default
+  const BalancedPool: typeof import('./balanced-pool').default
+  const Client: typeof import('./client').default
+  const H2CClient: typeof import('./h2c-client').default
+  const buildConnector: typeof import('./connector').default
+  const errors: typeof import('./errors').default
+  const Agent: typeof import('./agent').default
+  const setGlobalDispatcher: typeof import('./global-dispatcher').setGlobalDispatcher
+  const getGlobalDispatcher: typeof import('./global-dispatcher').getGlobalDispatcher
+  const request: typeof import('./api').request
+  const stream: typeof import('./api').stream
+  const pipeline: typeof import('./api').pipeline
+  const connect: typeof import('./api').connect
+  const upgrade: typeof import('./api').upgrade
+  const MockClient: typeof import('./mock-client').default
+  const MockPool: typeof import('./mock-pool').default
+  const MockAgent: typeof import('./mock-agent').default
+  const SnapshotAgent: typeof import('./snapshot-agent').SnapshotAgent
+  const MockCallHistory: typeof import('./mock-call-history').MockCallHistory
+  const MockCallHistoryLog: typeof import('./mock-call-history').MockCallHistoryLog
+  const mockErrors: typeof import('./mock-errors').default
+  const fetch: typeof import('./fetch').fetch
+  const Headers: typeof import('./fetch').Headers
+  const Response: typeof import('./fetch').Response
+  const Request: typeof import('./fetch').Request
+  const FormData: typeof import('./formdata').FormData
+  const caches: typeof import('./cache').caches
+  const interceptors: typeof import('./interceptors').default
+  const cacheStores: {
+    MemoryCacheStore: typeof import('./cache-interceptor').default.MemoryCacheStore,
+    SqliteCacheStore: typeof import('./cache-interceptor').default.SqliteCacheStore
+  }
+  const install: typeof globalThisInstall
 }
-export interface Packet {
-    type: PacketType;
-    nsp: string;
-    data?: any;
-    id?: number;
-    attachments?: number;
-}
-/**
- * A socket.io Encoder instance
- */
-export declare class Encoder {
-    private replacer?;
-    /**
-     * Encoder constructor
-     *
-     * @param {function} replacer - custom replacer to pass down to JSON.parse
-     */
-    constructor(replacer?: (this: any, key: string, value: any) => any);
-    /**
-     * Encode a packet as a single string if non-binary, or as a
-     * buffer sequence, depending on packet type.
-     *
-     * @param {Object} obj - packet object
-     */
-    encode(obj: Packet): any[];
-    /**
-     * Encode packet as string.
-     */
-    private encodeAsString;
-    /**
-     * Encode packet as 'buffer sequence' by removing blobs, and
-     * deconstructing packet into object with placeholders and
-     * a list of buffers.
-     */
-    private encodeAsBinary;
-}
-interface DecoderReservedEvents {
-    decoded: (packet: Packet) => void;
-}
-/**
- * A socket.io Decoder instance
- *
- * @return {Object} decoder
- */
-export declare class Decoder extends Emitter<{}, {}, DecoderReservedEvents> {
-    private reviver?;
-    private reconstructor;
-    /**
-     * Decoder constructor
-     *
-     * @param {function} reviver - custom reviver to pass down to JSON.stringify
-     */
-    constructor(reviver?: (this: any, key: string, value: any) => any);
-    /**
-     * Decodes an encoded packet string into packet JSON.
-     *
-     * @param {String} obj - encoded packet
-     */
-    add(obj: any): void;
-    /**
-     * Decode a packet String (JSON data)
-     *
-     * @param {String} str
-     * @return {Object} packet
-     */
-    private decodeString;
-    private tryParse;
-    private static isPayloadValid;
-    /**
-     * Deallocates a parser's resources
-     */
-    destroy(): void;
-}
-export {};
