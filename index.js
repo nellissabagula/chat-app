@@ -1,287 +1,289 @@
-'use strict';
-
-const fs = require('fs');
-const { Readable } = require('stream');
-const sysPath = require('path');
-const { promisify } = require('util');
-const picomatch = require('picomatch');
-
-const readdir = promisify(fs.readdir);
-const stat = promisify(fs.stat);
-const lstat = promisify(fs.lstat);
-const realpath = promisify(fs.realpath);
-
-/**
- * @typedef {Object} EntryInfo
- * @property {String} path
- * @property {String} fullPath
- * @property {fs.Stats=} stats
- * @property {fs.Dirent=} dirent
- * @property {String} basename
+/*!
+ * http-errors
+ * Copyright(c) 2014 Jonathan Ong
+ * Copyright(c) 2016 Douglas Christopher Wilson
+ * MIT Licensed
  */
 
-const BANG = '!';
-const RECURSIVE_ERROR_CODE = 'READDIRP_RECURSIVE_ERROR';
-const NORMAL_FLOW_ERRORS = new Set(['ENOENT', 'EPERM', 'EACCES', 'ELOOP', RECURSIVE_ERROR_CODE]);
-const FILE_TYPE = 'files';
-const DIR_TYPE = 'directories';
-const FILE_DIR_TYPE = 'files_directories';
-const EVERYTHING_TYPE = 'all';
-const ALL_TYPES = [FILE_TYPE, DIR_TYPE, FILE_DIR_TYPE, EVERYTHING_TYPE];
+'use strict'
 
-const isNormalFlowError = error => NORMAL_FLOW_ERRORS.has(error.code);
-const [maj, min] = process.versions.node.split('.').slice(0, 2).map(n => Number.parseInt(n, 10));
-const wantBigintFsStats = process.platform === 'win32' && (maj > 10 || (maj === 10 && min >= 5));
+/**
+ * Module dependencies.
+ * @private
+ */
 
-const normalizeFilter = filter => {
-  if (filter === undefined) return;
-  if (typeof filter === 'function') return filter;
+var deprecate = require('depd')('http-errors')
+var setPrototypeOf = require('setprototypeof')
+var statuses = require('statuses')
+var inherits = require('inherits')
+var toIdentifier = require('toidentifier')
 
-  if (typeof filter === 'string') {
-    const glob = picomatch(filter.trim());
-    return entry => glob(entry.basename);
-  }
+/**
+ * Module exports.
+ * @public
+ */
 
-  if (Array.isArray(filter)) {
-    const positive = [];
-    const negative = [];
-    for (const item of filter) {
-      const trimmed = item.trim();
-      if (trimmed.charAt(0) === BANG) {
-        negative.push(picomatch(trimmed.slice(1)));
-      } else {
-        positive.push(picomatch(trimmed));
-      }
-    }
+module.exports = createError
+module.exports.HttpError = createHttpErrorConstructor()
+module.exports.isHttpError = createIsHttpErrorFunction(module.exports.HttpError)
 
-    if (negative.length > 0) {
-      if (positive.length > 0) {
-        return entry =>
-          positive.some(f => f(entry.basename)) && !negative.some(f => f(entry.basename));
-      }
-      return entry => !negative.some(f => f(entry.basename));
-    }
-    return entry => positive.some(f => f(entry.basename));
-  }
-};
+// Populate exports for all constructors
+populateConstructorExports(module.exports, statuses.codes, module.exports.HttpError)
 
-class ReaddirpStream extends Readable {
-  static get defaultOptions() {
-    return {
-      root: '.',
-      /* eslint-disable no-unused-vars */
-      fileFilter: (path) => true,
-      directoryFilter: (path) => true,
-      /* eslint-enable no-unused-vars */
-      type: FILE_TYPE,
-      lstat: false,
-      depth: 2147483648,
-      alwaysStat: false
-    };
-  }
+/**
+ * Get the code class of a status code.
+ * @private
+ */
 
-  constructor(options = {}) {
-    super({
-      objectMode: true,
-      autoDestroy: true,
-      highWaterMark: options.highWaterMark || 4096
-    });
-    const opts = { ...ReaddirpStream.defaultOptions, ...options };
-    const { root, type } = opts;
+function codeClass (status) {
+  return Number(String(status).charAt(0) + '00')
+}
 
-    this._fileFilter = normalizeFilter(opts.fileFilter);
-    this._directoryFilter = normalizeFilter(opts.directoryFilter);
+/**
+ * Create a new HTTP Error.
+ *
+ * @returns {Error}
+ * @public
+ */
 
-    const statMethod = opts.lstat ? lstat : stat;
-    // Use bigint stats if it's windows and stat() supports options (node 10+).
-    if (wantBigintFsStats) {
-      this._stat = path => statMethod(path, { bigint: true });
+function createError () {
+  // so much arity going on ~_~
+  var err
+  var msg
+  var status = 500
+  var props = {}
+  for (var i = 0; i < arguments.length; i++) {
+    var arg = arguments[i]
+    var type = typeof arg
+    if (type === 'object' && arg instanceof Error) {
+      err = arg
+      status = err.status || err.statusCode || status
+    } else if (type === 'number' && i === 0) {
+      status = arg
+    } else if (type === 'string') {
+      msg = arg
+    } else if (type === 'object') {
+      props = arg
     } else {
-      this._stat = statMethod;
-    }
-
-    this._maxDepth = opts.depth;
-    this._wantsDir = [DIR_TYPE, FILE_DIR_TYPE, EVERYTHING_TYPE].includes(type);
-    this._wantsFile = [FILE_TYPE, FILE_DIR_TYPE, EVERYTHING_TYPE].includes(type);
-    this._wantsEverything = type === EVERYTHING_TYPE;
-    this._root = sysPath.resolve(root);
-    this._isDirent = ('Dirent' in fs) && !opts.alwaysStat;
-    this._statsProp = this._isDirent ? 'dirent' : 'stats';
-    this._rdOptions = { encoding: 'utf8', withFileTypes: this._isDirent };
-
-    // Launch stream with one parent, the root dir.
-    this.parents = [this._exploreDir(root, 1)];
-    this.reading = false;
-    this.parent = undefined;
-  }
-
-  async _read(batch) {
-    if (this.reading) return;
-    this.reading = true;
-
-    try {
-      while (!this.destroyed && batch > 0) {
-        const { path, depth, files = [] } = this.parent || {};
-
-        if (files.length > 0) {
-          const slice = files.splice(0, batch).map(dirent => this._formatEntry(dirent, path));
-          for (const entry of await Promise.all(slice)) {
-            if (this.destroyed) return;
-
-            const entryType = await this._getEntryType(entry);
-            if (entryType === 'directory' && this._directoryFilter(entry)) {
-              if (depth <= this._maxDepth) {
-                this.parents.push(this._exploreDir(entry.fullPath, depth + 1));
-              }
-
-              if (this._wantsDir) {
-                this.push(entry);
-                batch--;
-              }
-            } else if ((entryType === 'file' || this._includeAsFile(entry)) && this._fileFilter(entry)) {
-              if (this._wantsFile) {
-                this.push(entry);
-                batch--;
-              }
-            }
-          }
-        } else {
-          const parent = this.parents.pop();
-          if (!parent) {
-            this.push(null);
-            break;
-          }
-          this.parent = await parent;
-          if (this.destroyed) return;
-        }
-      }
-    } catch (error) {
-      this.destroy(error);
-    } finally {
-      this.reading = false;
+      throw new TypeError('argument #' + (i + 1) + ' unsupported type ' + type)
     }
   }
 
-  async _exploreDir(path, depth) {
-    let files;
-    try {
-      files = await readdir(path, this._rdOptions);
-    } catch (error) {
-      this._onError(error);
-    }
-    return { files, depth, path };
+  if (typeof status === 'number' && (status < 400 || status >= 600)) {
+    deprecate('non-error status code; use only 4xx or 5xx status codes')
   }
 
-  async _formatEntry(dirent, path) {
-    let entry;
-    try {
-      const basename = this._isDirent ? dirent.name : dirent;
-      const fullPath = sysPath.resolve(sysPath.join(path, basename));
-      entry = { path: sysPath.relative(this._root, fullPath), fullPath, basename };
-      entry[this._statsProp] = this._isDirent ? dirent : await this._stat(fullPath);
-    } catch (err) {
-      this._onError(err);
-    }
-    return entry;
+  if (typeof status !== 'number' ||
+    (!statuses.message[status] && (status < 400 || status >= 600))) {
+    status = 500
   }
 
-  _onError(err) {
-    if (isNormalFlowError(err) && !this.destroyed) {
-      this.emit('warn', err);
-    } else {
-      this.destroy(err);
-    }
+  // constructor
+  var HttpError = createError[status] || createError[codeClass(status)]
+
+  if (!err) {
+    // create error
+    err = HttpError
+      ? new HttpError(msg)
+      : new Error(msg || statuses.message[status])
+    Error.captureStackTrace(err, createError)
   }
 
-  async _getEntryType(entry) {
-    // entry may be undefined, because a warning or an error were emitted
-    // and the statsProp is undefined
-    const stats = entry && entry[this._statsProp];
-    if (!stats) {
-      return;
-    }
-    if (stats.isFile()) {
-      return 'file';
-    }
-    if (stats.isDirectory()) {
-      return 'directory';
-    }
-    if (stats && stats.isSymbolicLink()) {
-      const full = entry.fullPath;
-      try {
-        const entryRealPath = await realpath(full);
-        const entryRealPathStats = await lstat(entryRealPath);
-        if (entryRealPathStats.isFile()) {
-          return 'file';
-        }
-        if (entryRealPathStats.isDirectory()) {
-          const len = entryRealPath.length;
-          if (full.startsWith(entryRealPath) && full.substr(len, 1) === sysPath.sep) {
-            const recursiveError = new Error(
-              `Circular symlink detected: "${full}" points to "${entryRealPath}"`
-            );
-            recursiveError.code = RECURSIVE_ERROR_CODE;
-            return this._onError(recursiveError);
-          }
-          return 'directory';
-        }
-      } catch (error) {
-        this._onError(error);
-      }
+  if (!HttpError || !(err instanceof HttpError) || err.status !== status) {
+    // add properties to generic error
+    err.expose = status < 500
+    err.status = err.statusCode = status
+  }
+
+  for (var key in props) {
+    if (key !== 'status' && key !== 'statusCode') {
+      err[key] = props[key]
     }
   }
 
-  _includeAsFile(entry) {
-    const stats = entry && entry[this._statsProp];
+  return err
+}
 
-    return stats && this._wantsEverything && !stats.isDirectory();
+/**
+ * Create HTTP error abstract base class.
+ * @private
+ */
+
+function createHttpErrorConstructor () {
+  function HttpError () {
+    throw new TypeError('cannot construct abstract class')
+  }
+
+  inherits(HttpError, Error)
+
+  return HttpError
+}
+
+/**
+ * Create a constructor for a client error.
+ * @private
+ */
+
+function createClientErrorConstructor (HttpError, name, code) {
+  var className = toClassName(name)
+
+  function ClientError (message) {
+    // create the error object
+    var msg = message != null ? message : statuses.message[code]
+    var err = new Error(msg)
+
+    // capture a stack trace to the construction point
+    Error.captureStackTrace(err, ClientError)
+
+    // adjust the [[Prototype]]
+    setPrototypeOf(err, ClientError.prototype)
+
+    // redefine the error message
+    Object.defineProperty(err, 'message', {
+      enumerable: true,
+      configurable: true,
+      value: msg,
+      writable: true
+    })
+
+    // redefine the error name
+    Object.defineProperty(err, 'name', {
+      enumerable: false,
+      configurable: true,
+      value: className,
+      writable: true
+    })
+
+    return err
+  }
+
+  inherits(ClientError, HttpError)
+  nameFunc(ClientError, className)
+
+  ClientError.prototype.status = code
+  ClientError.prototype.statusCode = code
+  ClientError.prototype.expose = true
+
+  return ClientError
+}
+
+/**
+ * Create function to test is a value is a HttpError.
+ * @private
+ */
+
+function createIsHttpErrorFunction (HttpError) {
+  return function isHttpError (val) {
+    if (!val || typeof val !== 'object') {
+      return false
+    }
+
+    if (val instanceof HttpError) {
+      return true
+    }
+
+    return val instanceof Error &&
+      typeof val.expose === 'boolean' &&
+      typeof val.statusCode === 'number' && val.status === val.statusCode
   }
 }
 
 /**
- * @typedef {Object} ReaddirpArguments
- * @property {Function=} fileFilter
- * @property {Function=} directoryFilter
- * @property {String=} type
- * @property {Number=} depth
- * @property {String=} root
- * @property {Boolean=} lstat
- * @property {Boolean=} bigint
+ * Create a constructor for a server error.
+ * @private
  */
 
-/**
- * Main function which ends up calling readdirRec and reads all files and directories in given root recursively.
- * @param {String} root Root directory
- * @param {ReaddirpArguments=} options Options to specify root (start directory), filters and recursion depth
- */
-const readdirp = (root, options = {}) => {
-  let type = options.entryType || options.type;
-  if (type === 'both') type = FILE_DIR_TYPE; // backwards-compatibility
-  if (type) options.type = type;
-  if (!root) {
-    throw new Error('readdirp: root argument is required. Usage: readdirp(root, options)');
-  } else if (typeof root !== 'string') {
-    throw new TypeError('readdirp: root argument must be a string. Usage: readdirp(root, options)');
-  } else if (type && !ALL_TYPES.includes(type)) {
-    throw new Error(`readdirp: Invalid type passed. Use one of ${ALL_TYPES.join(', ')}`);
+function createServerErrorConstructor (HttpError, name, code) {
+  var className = toClassName(name)
+
+  function ServerError (message) {
+    // create the error object
+    var msg = message != null ? message : statuses.message[code]
+    var err = new Error(msg)
+
+    // capture a stack trace to the construction point
+    Error.captureStackTrace(err, ServerError)
+
+    // adjust the [[Prototype]]
+    setPrototypeOf(err, ServerError.prototype)
+
+    // redefine the error message
+    Object.defineProperty(err, 'message', {
+      enumerable: true,
+      configurable: true,
+      value: msg,
+      writable: true
+    })
+
+    // redefine the error name
+    Object.defineProperty(err, 'name', {
+      enumerable: false,
+      configurable: true,
+      value: className,
+      writable: true
+    })
+
+    return err
   }
 
-  options.root = root;
-  return new ReaddirpStream(options);
-};
+  inherits(ServerError, HttpError)
+  nameFunc(ServerError, className)
 
-const readdirpPromise = (root, options = {}) => {
-  return new Promise((resolve, reject) => {
-    const files = [];
-    readdirp(root, options)
-      .on('data', entry => files.push(entry))
-      .on('end', () => resolve(files))
-      .on('error', error => reject(error));
-  });
-};
+  ServerError.prototype.status = code
+  ServerError.prototype.statusCode = code
+  ServerError.prototype.expose = false
 
-readdirp.promise = readdirpPromise;
-readdirp.ReaddirpStream = ReaddirpStream;
-readdirp.default = readdirp;
+  return ServerError
+}
 
-module.exports = readdirp;
+/**
+ * Set the name of a function, if possible.
+ * @private
+ */
+
+function nameFunc (func, name) {
+  var desc = Object.getOwnPropertyDescriptor(func, 'name')
+
+  if (desc && desc.configurable) {
+    desc.value = name
+    Object.defineProperty(func, 'name', desc)
+  }
+}
+
+/**
+ * Populate the exports object with constructors for every error class.
+ * @private
+ */
+
+function populateConstructorExports (exports, codes, HttpError) {
+  codes.forEach(function forEachCode (code) {
+    var CodeError
+    var name = toIdentifier(statuses.message[code])
+
+    switch (codeClass(code)) {
+      case 400:
+        CodeError = createClientErrorConstructor(HttpError, name, code)
+        break
+      case 500:
+        CodeError = createServerErrorConstructor(HttpError, name, code)
+        break
+    }
+
+    if (CodeError) {
+      // export the constructor
+      exports[code] = CodeError
+      exports[name] = CodeError
+    }
+  })
+}
+
+/**
+ * Get a class name from a name identifier.
+ * @private
+ */
+
+function toClassName (name) {
+  return name.substr(-5) !== 'Error'
+    ? name + 'Error'
+    : name
+}

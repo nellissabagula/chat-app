@@ -1,122 +1,169 @@
-# readdirp [![Weekly downloads](https://img.shields.io/npm/dw/readdirp.svg)](https://github.com/paulmillr/readdirp)
+# http-errors
 
-Recursive version of [fs.readdir](https://nodejs.org/api/fs.html#fs_fs_readdir_path_options_callback). Exposes a **stream API** and a **promise API**.
+[![NPM Version][npm-version-image]][npm-url]
+[![NPM Downloads][npm-downloads-image]][node-url]
+[![Node.js Version][node-image]][node-url]
+[![Build Status][ci-image]][ci-url]
+[![Test Coverage][coveralls-image]][coveralls-url]
 
+Create HTTP errors for Express, Koa, Connect, etc. with ease.
 
-```sh
-npm install readdirp
+## Install
+
+This is a [Node.js](https://nodejs.org/en/) module available through the
+[npm registry](https://www.npmjs.com/). Installation is done using the
+[`npm install` command](https://docs.npmjs.com/getting-started/installing-npm-packages-locally):
+
+```console
+$ npm install http-errors
 ```
 
-```javascript
-const readdirp = require('readdirp');
+## Example
 
-// Use streams to achieve small RAM & CPU footprint.
-// 1) Streams example with for-await.
-for await (const entry of readdirp('.')) {
-  const {path} = entry;
-  console.log(`${JSON.stringify({path})}`);
-}
+```js
+var createError = require('http-errors')
+var express = require('express')
+var app = express()
 
-// 2) Streams example, non for-await.
-// Print out all JS files along with their size within the current folder & subfolders.
-readdirp('.', {fileFilter: '*.js', alwaysStat: true})
-  .on('data', (entry) => {
-    const {path, stats: {size}} = entry;
-    console.log(`${JSON.stringify({path, size})}`);
-  })
-  // Optionally call stream.destroy() in `warn()` in order to abort and cause 'close' to be emitted
-  .on('warn', error => console.error('non-fatal error', error))
-  .on('error', error => console.error('fatal error', error))
-  .on('end', () => console.log('done'));
-
-// 3) Promise example. More RAM and CPU than streams / for-await.
-const files = await readdirp.promise('.');
-console.log(files.map(file => file.path));
-
-// Other options.
-readdirp('test', {
-  fileFilter: '*.js',
-  directoryFilter: ['!.git', '!*modules']
-  // directoryFilter: (di) => di.basename.length === 9
-  type: 'files_directories',
-  depth: 1
-});
+app.use(function (req, res, next) {
+  if (!req.user) return next(createError(401, 'Please login to view this page.'))
+  next()
+})
 ```
-
-For more examples, check out `examples` directory.
 
 ## API
 
-`const stream = readdirp(root[, options])` — **Stream API**
+This is the current API, currently extracted from Koa and subject to change.
 
-- Reads given root recursively and returns a `stream` of [entry infos](#entryinfo)
-- Optionally can be used like `for await (const entry of stream)` with node.js 10+ (`asyncIterator`).
-- `on('data', (entry) => {})` [entry info](#entryinfo) for every file / dir.
-- `on('warn', (error) => {})` non-fatal `Error` that prevents a file / dir from being processed. Example: inaccessible to the user.
-- `on('error', (error) => {})` fatal `Error` which also ends the stream. Example: illegal options where passed.
-- `on('end')` — we are done. Called when all entries were found and no more will be emitted.
-- `on('close')` — stream is destroyed via `stream.destroy()`.
-  Could be useful if you want to manually abort even on a non fatal error.
-  At that point the stream is no longer `readable` and no more entries, warning or errors are emitted
-- To learn more about streams, consult the very detailed [nodejs streams documentation](https://nodejs.org/api/stream.html)
-  or the [stream-handbook](https://github.com/substack/stream-handbook)
+### Error Properties
 
-`const entries = await readdirp.promise(root[, options])` — **Promise API**. Returns a list of [entry infos](#entryinfo).
+- `expose` - can be used to signal if `message` should be sent to the client,
+  defaulting to `false` when `status` >= 500
+- `headers` - can be an object of header names to values to be sent to the
+  client, defaulting to `undefined`. When defined, the key names should all
+  be lower-cased
+- `message` - the traditional error message, which should be kept short and all
+  single line
+- `status` - the status code of the error, mirroring `statusCode` for general
+  compatibility
+- `statusCode` - the status code of the error, defaulting to `500`
 
-First argument is awalys `root`, path in which to start reading and recursing into subdirectories.
+### createError([status], [message], [properties])
 
-### options
+Create a new error object with the given message `msg`.
+The error object inherits from `createError.HttpError`.
 
-- `fileFilter: ["*.js"]`: filter to include or exclude files. A `Function`, Glob string or Array of glob strings.
-    - **Function**: a function that takes an entry info as a parameter and returns true to include or false to exclude the entry
-    - **Glob string**: a string (e.g., `*.js`) which is matched using [picomatch](https://github.com/micromatch/picomatch), so go there for more
-        information. Globstars (`**`) are not supported since specifying a recursive pattern for an already recursive function doesn't make sense. Negated globs (as explained in the minimatch documentation) are allowed, e.g., `!*.txt` matches everything but text files.
-    - **Array of glob strings**: either need to be all inclusive or all exclusive (negated) patterns otherwise an error is thrown.
-        `['*.json', '*.js']` includes all JavaScript and Json files.
-        `['!.git', '!node_modules']` includes all directories except the '.git' and 'node_modules'.
-    - Directories that do not pass a filter will not be recursed into.
-- `directoryFilter: ['!.git']`: filter to include/exclude directories found and to recurse into. Directories that do not pass a filter will not be recursed into.
-- `depth: 5`: depth at which to stop recursing even if more subdirectories are found
-- `type: 'files'`: determines if data events on the stream should be emitted for `'files'` (default), `'directories'`, `'files_directories'`, or `'all'`. Setting to `'all'` will also include entries for other types of file descriptors like character devices, unix sockets and named pipes.
-- `alwaysStat: false`: always return `stats` property for every file. Default is `false`, readdirp will return `Dirent` entries. Setting it to `true` can double readdir execution time - use it only when you need file `size`, `mtime` etc. Cannot be enabled on node <10.10.0.
-- `lstat: false`: include symlink entries in the stream along with files. When `true`, `fs.lstat` would be used instead of `fs.stat`
+```js
+var err = createError(404, 'This video does not exist!')
+```
 
-### `EntryInfo`
+- `status: 500` - the status code as a number
+- `message` - the message of the error, defaulting to node's text for that status code.
+- `properties` - custom properties to attach to the object
 
-Has the following properties:
+### createError([status], [error], [properties])
 
-- `path: 'assets/javascripts/react.js'`: path to the file/directory (relative to given root)
-- `fullPath: '/Users/dev/projects/app/assets/javascripts/react.js'`: full path to the file/directory found
-- `basename: 'react.js'`: name of the file/directory
-- `dirent: fs.Dirent`: built-in [dir entry object](https://nodejs.org/api/fs.html#fs_class_fs_dirent) - only with `alwaysStat: false`
-- `stats: fs.Stats`: built in [stat object](https://nodejs.org/api/fs.html#fs_class_fs_stats) - only with `alwaysStat: true`
+Extend the given `error` object with `createError.HttpError`
+properties. This will not alter the inheritance of the given
+`error` object, and the modified `error` object is the
+return value.
 
-## Changelog
+<!-- eslint-disable no-redeclare -->
 
-- 3.5 (Oct 13, 2020) disallows recursive directory-based symlinks.
-  Before, it could have entered infinite loop.
-- 3.4 (Mar 19, 2020) adds support for directory-based symlinks.
-- 3.3 (Dec 6, 2019) stabilizes RAM consumption and enables perf management with `highWaterMark` option. Fixes race conditions related to `for-await` looping.
-- 3.2 (Oct 14, 2019) improves performance by 250% and makes streams implementation more idiomatic.
-- 3.1 (Jul 7, 2019) brings `bigint` support to `stat` output on Windows. This is backwards-incompatible for some cases. Be careful. It you use it incorrectly, you'll see "TypeError: Cannot mix BigInt and other types, use explicit conversions".
-- 3.0 brings huge performance improvements and stream backpressure support.
-- Upgrading 2.x to 3.x:
-    - Signature changed from `readdirp(options)` to `readdirp(root, options)`
-    - Replaced callback API with promise API.
-    - Renamed `entryType` option to `type`
-    - Renamed `entryType: 'both'` to `'files_directories'`
-    - `EntryInfo`
-        - Renamed `stat` to `stats`
-            - Emitted only when `alwaysStat: true`
-            - `dirent` is emitted instead of `stats` by default with `alwaysStat: false`
-        - Renamed `name` to `basename`
-        - Removed `parentDir` and `fullParentDir` properties
-- Supported node.js versions:
-    - 3.x: node 8+
-    - 2.x: node 0.6+
+```js
+fs.readFile('foo.txt', function (err, buf) {
+  if (err) {
+    if (err.code === 'ENOENT') {
+      var httpError = createError(404, err, { expose: false })
+    } else {
+      var httpError = createError(500, err)
+    }
+  }
+})
+```
+
+- `status` - the status code as a number
+- `error` - the error object to extend
+- `properties` - custom properties to attach to the object
+
+### createError.isHttpError(val)
+
+Determine if the provided `val` is an `HttpError`. This will return `true`
+if the error inherits from the `HttpError` constructor of this module or
+matches the "duck type" for an error this module creates. All outputs from
+the `createError` factory will return `true` for this function, including
+if an non-`HttpError` was passed into the factory.
+
+### new createError\[code || name\](\[msg]\))
+
+Create a new error object with the given message `msg`.
+The error object inherits from `createError.HttpError`.
+
+```js
+var err = new createError.NotFound()
+```
+
+- `code` - the status code as a number
+- `name` - the name of the error as a "bumpy case", i.e. `NotFound` or `InternalServerError`.
+
+#### List of all constructors
+
+|Status Code|Constructor Name             |
+|-----------|-----------------------------|
+|400        |BadRequest                   |
+|401        |Unauthorized                 |
+|402        |PaymentRequired              |
+|403        |Forbidden                    |
+|404        |NotFound                     |
+|405        |MethodNotAllowed             |
+|406        |NotAcceptable                |
+|407        |ProxyAuthenticationRequired  |
+|408        |RequestTimeout               |
+|409        |Conflict                     |
+|410        |Gone                         |
+|411        |LengthRequired               |
+|412        |PreconditionFailed           |
+|413        |PayloadTooLarge              |
+|414        |URITooLong                   |
+|415        |UnsupportedMediaType         |
+|416        |RangeNotSatisfiable          |
+|417        |ExpectationFailed            |
+|418        |ImATeapot                    |
+|421        |MisdirectedRequest           |
+|422        |UnprocessableEntity          |
+|423        |Locked                       |
+|424        |FailedDependency             |
+|425        |TooEarly                     |
+|426        |UpgradeRequired              |
+|428        |PreconditionRequired         |
+|429        |TooManyRequests              |
+|431        |RequestHeaderFieldsTooLarge  |
+|451        |UnavailableForLegalReasons   |
+|500        |InternalServerError          |
+|501        |NotImplemented               |
+|502        |BadGateway                   |
+|503        |ServiceUnavailable           |
+|504        |GatewayTimeout               |
+|505        |HTTPVersionNotSupported      |
+|506        |VariantAlsoNegotiates        |
+|507        |InsufficientStorage          |
+|508        |LoopDetected                 |
+|509        |BandwidthLimitExceeded       |
+|510        |NotExtended                  |
+|511        |NetworkAuthenticationRequired|
 
 ## License
 
-Copyright (c) 2012-2019 Thorsten Lorenz, Paul Miller (<https://paulmillr.com>)
+[MIT](LICENSE)
 
-MIT License, see [LICENSE](LICENSE) file.
+[ci-image]: https://badgen.net/github/checks/jshttp/http-errors/master?label=ci
+[ci-url]: https://github.com/jshttp/http-errors/actions?query=workflow%3Aci
+[coveralls-image]: https://badgen.net/coveralls/c/github/jshttp/http-errors/master
+[coveralls-url]: https://coveralls.io/r/jshttp/http-errors?branch=master
+[node-image]: https://badgen.net/npm/node/http-errors
+[node-url]: https://nodejs.org/en/download
+[npm-downloads-image]: https://badgen.net/npm/dm/http-errors
+[npm-url]: https://npmjs.org/package/http-errors
+[npm-version-image]: https://badgen.net/npm/v/http-errors
+[travis-image]: https://badgen.net/travis/jshttp/http-errors/master
+[travis-url]: https://travis-ci.org/jshttp/http-errors
