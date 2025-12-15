@@ -1,156 +1,230 @@
-## Pure JS character encoding conversion [![Build Status](https://travis-ci.org/ashtuchkin/iconv-lite.svg?branch=master)](https://travis-ci.org/ashtuchkin/iconv-lite)
+# minimatch
 
- * Doesn't need native code compilation. Works on Windows and in sandboxed environments like [Cloud9](http://c9.io).
- * Used in popular projects like [Express.js (body_parser)](https://github.com/expressjs/body-parser), 
-   [Grunt](http://gruntjs.com/), [Nodemailer](http://www.nodemailer.com/), [Yeoman](http://yeoman.io/) and others.
- * Faster than [node-iconv](https://github.com/bnoordhuis/node-iconv) (see below for performance comparison).
- * Intuitive encode/decode API
- * Streaming support for Node v0.10+
- * [Deprecated] Can extend Node.js primitives (buffers, streams) to support all iconv-lite encodings.
- * In-browser usage via [Browserify](https://github.com/substack/node-browserify) (~180k gzip compressed with Buffer shim included).
- * Typescript [type definition file](https://github.com/ashtuchkin/iconv-lite/blob/master/lib/index.d.ts) included.
- * React Native is supported (need to explicitly `npm install` two more modules: `buffer` and `stream`).
- * License: MIT.
+A minimal matching utility.
 
-[![NPM Stats](https://nodei.co/npm/iconv-lite.png?downloads=true&downloadRank=true)](https://npmjs.org/packages/iconv-lite/)
+[![Build Status](https://travis-ci.org/isaacs/minimatch.svg?branch=master)](http://travis-ci.org/isaacs/minimatch)
+
+
+This is the matching library used internally by npm.
+
+It works by converting glob expressions into JavaScript `RegExp`
+objects.
 
 ## Usage
-### Basic API
-```javascript
-var iconv = require('iconv-lite');
-
-// Convert from an encoded buffer to js string.
-str = iconv.decode(Buffer.from([0x68, 0x65, 0x6c, 0x6c, 0x6f]), 'win1251');
-
-// Convert from js string to an encoded buffer.
-buf = iconv.encode("Sample input string", 'win1251');
-
-// Check if encoding is supported
-iconv.encodingExists("us-ascii")
-```
-
-### Streaming API (Node v0.10+)
-```javascript
-
-// Decode stream (from binary stream to js strings)
-http.createServer(function(req, res) {
-    var converterStream = iconv.decodeStream('win1251');
-    req.pipe(converterStream);
-
-    converterStream.on('data', function(str) {
-        console.log(str); // Do something with decoded strings, chunk-by-chunk.
-    });
-});
-
-// Convert encoding streaming example
-fs.createReadStream('file-in-win1251.txt')
-    .pipe(iconv.decodeStream('win1251'))
-    .pipe(iconv.encodeStream('ucs2'))
-    .pipe(fs.createWriteStream('file-in-ucs2.txt'));
-
-// Sugar: all encode/decode streams have .collect(cb) method to accumulate data.
-http.createServer(function(req, res) {
-    req.pipe(iconv.decodeStream('win1251')).collect(function(err, body) {
-        assert(typeof body == 'string');
-        console.log(body); // full request body string
-    });
-});
-```
-
-### [Deprecated] Extend Node.js own encodings
-> NOTE: This doesn't work on latest Node versions. See [details](https://github.com/ashtuchkin/iconv-lite/wiki/Node-v4-compatibility).
 
 ```javascript
-// After this call all Node basic primitives will understand iconv-lite encodings.
-iconv.extendNodeEncodings();
+var minimatch = require("minimatch")
 
-// Examples:
-buf = new Buffer(str, 'win1251');
-buf.write(str, 'gbk');
-str = buf.toString('latin1');
-assert(Buffer.isEncoding('iso-8859-15'));
-Buffer.byteLength(str, 'us-ascii');
-
-http.createServer(function(req, res) {
-    req.setEncoding('big5');
-    req.collect(function(err, body) {
-        console.log(body);
-    });
-});
-
-fs.createReadStream("file.txt", "shift_jis");
-
-// External modules are also supported (if they use Node primitives, which they probably do).
-request = require('request');
-request({
-    url: "http://github.com/", 
-    encoding: "cp932"
-});
-
-// To remove extensions
-iconv.undoExtendNodeEncodings();
+minimatch("bar.foo", "*.foo") // true!
+minimatch("bar.foo", "*.bar") // false!
+minimatch("bar.foo", "*.+(bar|foo)", { debug: true }) // true, and noisy!
 ```
 
-## Supported encodings
+## Features
 
- *  All node.js native encodings: utf8, ucs2 / utf16-le, ascii, binary, base64, hex.
- *  Additional unicode encodings: utf16, utf16-be, utf-7, utf-7-imap.
- *  All widespread singlebyte encodings: Windows 125x family, ISO-8859 family, 
-    IBM/DOS codepages, Macintosh family, KOI8 family, all others supported by iconv library. 
-    Aliases like 'latin1', 'us-ascii' also supported.
- *  All widespread multibyte encodings: CP932, CP936, CP949, CP950, GB2312, GBK, GB18030, Big5, Shift_JIS, EUC-JP.
+Supports these glob features:
 
-See [all supported encodings on wiki](https://github.com/ashtuchkin/iconv-lite/wiki/Supported-Encodings).
+* Brace Expansion
+* Extended glob matching
+* "Globstar" `**` matching
 
-Most singlebyte encodings are generated automatically from [node-iconv](https://github.com/bnoordhuis/node-iconv). Thank you Ben Noordhuis and libiconv authors!
+See:
 
-Multibyte encodings are generated from [Unicode.org mappings](http://www.unicode.org/Public/MAPPINGS/) and [WHATWG Encoding Standard mappings](http://encoding.spec.whatwg.org/). Thank you, respective authors!
+* `man sh`
+* `man bash`
+* `man 3 fnmatch`
+* `man 5 gitignore`
 
+## Minimatch Class
 
-## Encoding/decoding speed
+Create a minimatch object by instantiating the `minimatch.Minimatch` class.
 
-Comparison with node-iconv module (1000x256kb, on MacBook Pro, Core i5/2.6 GHz, Node v0.12.0). 
-Note: your results may vary, so please always check on your hardware.
-
-    operation             iconv@2.1.4   iconv-lite@0.4.7
-    ----------------------------------------------------------
-    encode('win1251')     ~96 Mb/s      ~320 Mb/s
-    decode('win1251')     ~95 Mb/s      ~246 Mb/s
-
-## BOM handling
-
- * Decoding: BOM is stripped by default, unless overridden by passing `stripBOM: false` in options
-   (f.ex. `iconv.decode(buf, enc, {stripBOM: false})`).
-   A callback might also be given as a `stripBOM` parameter - it'll be called if BOM character was actually found.
- * If you want to detect UTF-8 BOM when decoding other encodings, use [node-autodetect-decoder-stream](https://github.com/danielgindi/node-autodetect-decoder-stream) module.
- * Encoding: No BOM added, unless overridden by `addBOM: true` option.
-
-## UTF-16 Encodings
-
-This library supports UTF-16LE, UTF-16BE and UTF-16 encodings. First two are straightforward, but UTF-16 is trying to be
-smart about endianness in the following ways:
- * Decoding: uses BOM and 'spaces heuristic' to determine input endianness. Default is UTF-16LE, but can be 
-   overridden with `defaultEncoding: 'utf-16be'` option. Strips BOM unless `stripBOM: false`.
- * Encoding: uses UTF-16LE and writes BOM by default. Use `addBOM: false` to override.
-
-## Other notes
-
-When decoding, be sure to supply a Buffer to decode() method, otherwise [bad things usually happen](https://github.com/ashtuchkin/iconv-lite/wiki/Use-Buffers-when-decoding).  
-Untranslatable characters are set to � or ?. No transliteration is currently supported.  
-Node versions 0.10.31 and 0.11.13 are buggy, don't use them (see #65, #77).  
-
-## Testing
-
-```bash
-$ git clone git@github.com:ashtuchkin/iconv-lite.git
-$ cd iconv-lite
-$ npm install
-$ npm test
-    
-$ # To view performance:
-$ node test/performance.js
-
-$ # To view test coverage:
-$ npm run coverage
-$ open coverage/lcov-report/index.html
+```javascript
+var Minimatch = require("minimatch").Minimatch
+var mm = new Minimatch(pattern, options)
 ```
+
+### Properties
+
+* `pattern` The original pattern the minimatch object represents.
+* `options` The options supplied to the constructor.
+* `set` A 2-dimensional array of regexp or string expressions.
+  Each row in the
+  array corresponds to a brace-expanded pattern.  Each item in the row
+  corresponds to a single path-part.  For example, the pattern
+  `{a,b/c}/d` would expand to a set of patterns like:
+
+        [ [ a, d ]
+        , [ b, c, d ] ]
+
+    If a portion of the pattern doesn't have any "magic" in it
+    (that is, it's something like `"foo"` rather than `fo*o?`), then it
+    will be left as a string rather than converted to a regular
+    expression.
+
+* `regexp` Created by the `makeRe` method.  A single regular expression
+  expressing the entire pattern.  This is useful in cases where you wish
+  to use the pattern somewhat like `fnmatch(3)` with `FNM_PATH` enabled.
+* `negate` True if the pattern is negated.
+* `comment` True if the pattern is a comment.
+* `empty` True if the pattern is `""`.
+
+### Methods
+
+* `makeRe` Generate the `regexp` member if necessary, and return it.
+  Will return `false` if the pattern is invalid.
+* `match(fname)` Return true if the filename matches the pattern, or
+  false otherwise.
+* `matchOne(fileArray, patternArray, partial)` Take a `/`-split
+  filename, and match it against a single row in the `regExpSet`.  This
+  method is mainly for internal use, but is exposed so that it can be
+  used by a glob-walker that needs to avoid excessive filesystem calls.
+
+All other methods are internal, and will be called as necessary.
+
+### minimatch(path, pattern, options)
+
+Main export.  Tests a path against the pattern using the options.
+
+```javascript
+var isJS = minimatch(file, "*.js", { matchBase: true })
+```
+
+### minimatch.filter(pattern, options)
+
+Returns a function that tests its
+supplied argument, suitable for use with `Array.filter`.  Example:
+
+```javascript
+var javascripts = fileList.filter(minimatch.filter("*.js", {matchBase: true}))
+```
+
+### minimatch.match(list, pattern, options)
+
+Match against the list of
+files, in the style of fnmatch or glob.  If nothing is matched, and
+options.nonull is set, then return a list containing the pattern itself.
+
+```javascript
+var javascripts = minimatch.match(fileList, "*.js", {matchBase: true}))
+```
+
+### minimatch.makeRe(pattern, options)
+
+Make a regular expression object from the pattern.
+
+## Options
+
+All options are `false` by default.
+
+### debug
+
+Dump a ton of stuff to stderr.
+
+### nobrace
+
+Do not expand `{a,b}` and `{1..3}` brace sets.
+
+### noglobstar
+
+Disable `**` matching against multiple folder names.
+
+### dot
+
+Allow patterns to match filenames starting with a period, even if
+the pattern does not explicitly have a period in that spot.
+
+Note that by default, `a/**/b` will **not** match `a/.d/b`, unless `dot`
+is set.
+
+### noext
+
+Disable "extglob" style patterns like `+(a|b)`.
+
+### nocase
+
+Perform a case-insensitive match.
+
+### nonull
+
+When a match is not found by `minimatch.match`, return a list containing
+the pattern itself if this option is set.  When not set, an empty list
+is returned if there are no matches.
+
+### matchBase
+
+If set, then patterns without slashes will be matched
+against the basename of the path if it contains slashes.  For example,
+`a?b` would match the path `/xyz/123/acb`, but not `/xyz/acb/123`.
+
+### nocomment
+
+Suppress the behavior of treating `#` at the start of a pattern as a
+comment.
+
+### nonegate
+
+Suppress the behavior of treating a leading `!` character as negation.
+
+### flipNegate
+
+Returns from negate expressions the same as if they were not negated.
+(Ie, true on a hit, false on a miss.)
+
+### partial
+
+Compare a partial path to a pattern.  As long as the parts of the path that
+are present are not contradicted by the pattern, it will be treated as a
+match.  This is useful in applications where you're walking through a
+folder structure, and don't yet have the full path, but want to ensure that
+you do not walk down paths that can never be a match.
+
+For example,
+
+```js
+minimatch('/a/b', '/a/*/c/d', { partial: true })  // true, might be /a/b/c/d
+minimatch('/a/b', '/**/d', { partial: true })     // true, might be /a/b/.../d
+minimatch('/x/y/z', '/a/**/z', { partial: true }) // false, because x !== a
+```
+
+### allowWindowsEscape
+
+Windows path separator `\` is by default converted to `/`, which
+prohibits the usage of `\` as a escape character. This flag skips that
+behavior and allows using the escape character.
+
+## Comparisons to other fnmatch/glob implementations
+
+While strict compliance with the existing standards is a worthwhile
+goal, some discrepancies exist between minimatch and other
+implementations, and are intentional.
+
+If the pattern starts with a `!` character, then it is negated.  Set the
+`nonegate` flag to suppress this behavior, and treat leading `!`
+characters normally.  This is perhaps relevant if you wish to start the
+pattern with a negative extglob pattern like `!(a|B)`.  Multiple `!`
+characters at the start of a pattern will negate the pattern multiple
+times.
+
+If a pattern starts with `#`, then it is treated as a comment, and
+will not match anything.  Use `\#` to match a literal `#` at the
+start of a line, or set the `nocomment` flag to suppress this behavior.
+
+The double-star character `**` is supported by default, unless the
+`noglobstar` flag is set.  This is supported in the manner of bsdglob
+and bash 4.1, where `**` only has special significance if it is the only
+thing in a path part.  That is, `a/**/b` will match `a/x/y/b`, but
+`a/**b` will not.
+
+If an escaped pattern has no matches, and the `nonull` flag is set,
+then minimatch.match returns the pattern as-provided, rather than
+interpreting the character escapes.  For example,
+`minimatch.match([], "\\*a\\?")` will return `"\\*a\\?"` rather than
+`"*a?"`.  This is akin to setting the `nullglob` option in bash, except
+that it does not resolve escaped pattern characters.
+
+If brace expansion is not disabled, then it is performed before any
+other interpretation of the glob pattern.  Thus, a pattern like
+`+(a|{b),c)}`, which would not be valid in bash or zsh, is expanded
+**first** into the set of `+(a|b)` and `+(a|c)`, and those patterns are
+checked for validity.  Since those two are valid, matching proceeds.
