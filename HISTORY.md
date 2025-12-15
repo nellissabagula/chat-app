@@ -1,82 +1,259 @@
-2.0.1 / 2021-01-03
+1.6.18 / 2019-04-26
+===================
+
+  * Fix regression passing request object to `typeis.is`
+
+1.6.17 / 2019-04-25
+===================
+
+  * deps: mime-types@~2.1.24
+    - Add Apple file extensions from IANA
+    - Add extension `.csl` to `application/vnd.citationstyles.style+xml`
+    - Add extension `.es` to `application/ecmascript`
+    - Add extension `.nq` to `application/n-quads`
+    - Add extension `.nt` to `application/n-triples`
+    - Add extension `.owl` to `application/rdf+xml`
+    - Add extensions `.siv` and `.sieve` to `application/sieve`
+    - Add extensions from IANA for `image/*` types
+    - Add extensions from IANA for `model/*` types
+    - Add extensions to HEIC image types
+    - Add new mime types
+    - Add `text/mdx` with extension `.mdx`
+  * perf: prevent internal `throw` on invalid type
+
+1.6.16 / 2018-02-16
+===================
+
+  * deps: mime-types@~2.1.18
+    - Add `application/raml+yaml` with extension `.raml`
+    - Add `application/wasm` with extension `.wasm`
+    - Add `text/shex` with extension `.shex`
+    - Add extensions for JPEG-2000 images
+    - Add extensions from IANA for `message/*` types
+    - Add extension `.mjs` to `application/javascript`
+    - Add extension `.wadl` to `application/vnd.sun.wadl+xml`
+    - Add extension `.gz` to `application/gzip`
+    - Add glTF types and extensions
+    - Add new mime types
+    - Update extensions `.md` and `.markdown` to be `text/markdown`
+    - Update font MIME types
+    - Update `text/hjson` to registered `application/hjson`
+
+1.6.15 / 2017-03-31
+===================
+
+  * deps: mime-types@~2.1.15
+    - Add new mime types
+
+1.6.14 / 2016-11-18
+===================
+
+  * deps: mime-types@~2.1.13
+    - Add new mime types
+
+1.6.13 / 2016-05-18
+===================
+
+  * deps: mime-types@~2.1.11
+    - Add new mime types
+
+1.6.12 / 2016-02-28
+===================
+
+  * deps: mime-types@~2.1.10
+    - Add new mime types
+    - Fix extension of `application/dash+xml`
+    - Update primary extension for `audio/mp4`
+
+1.6.11 / 2016-01-29
+===================
+
+  * deps: mime-types@~2.1.9
+    - Add new mime types
+
+1.6.10 / 2015-12-01
+===================
+
+  * deps: mime-types@~2.1.8
+    - Add new mime types
+
+1.6.9 / 2015-09-27
 ==================
 
-  * Fix returning values from `Object.prototype`
+  * deps: mime-types@~2.1.7
+    - Add new mime types
 
-2.0.0 / 2020-04-19
+1.6.8 / 2015-09-04
 ==================
 
-  * Drop support for Node.js 0.6
-  * Fix messaging casing of `418 I'm a Teapot`
-  * Remove code 306
-  * Remove `status[code]` exports; use `status.message[code]`
-  * Remove `status[msg]` exports; use `status.code[msg]`
-  * Rename `425 Unordered Collection` to standard `425 Too Early`
-  * Rename `STATUS_CODES` export to `message`
-  * Return status message for `statuses(code)` when given code
+  * deps: mime-types@~2.1.6
+    - Add new mime types
 
-1.5.0 / 2018-03-27
+1.6.7 / 2015-08-20
 ==================
 
-  * Add `103 Early Hints`
+  * Fix type error when given invalid type to match against
+  * deps: mime-types@~2.1.5
+    - Add new mime types
 
-1.4.0 / 2017-10-20
+1.6.6 / 2015-07-31
 ==================
 
-  * Add `STATUS_CODES` export
+  * deps: mime-types@~2.1.4
+    - Add new mime types
 
-1.3.1 / 2016-11-11
+1.6.5 / 2015-07-16
 ==================
 
-  * Fix return type in JSDoc
+  * deps: mime-types@~2.1.3
+    - Add new mime types
 
-1.3.0 / 2016-05-17
+1.6.4 / 2015-07-01
 ==================
 
-  * Add `421 Misdirected Request`
+  * deps: mime-types@~2.1.2
+    - Add new mime types
   * perf: enable strict mode
+  * perf: remove argument reassignment
 
-1.2.1 / 2015-02-01
+1.6.3 / 2015-06-08
 ==================
 
-  * Fix message for status 451
-    - `451 Unavailable For Legal Reasons`
+  * deps: mime-types@~2.1.1
+    - Add new mime types
+  * perf: reduce try block size
+  * perf: remove bitwise operations
 
-1.2.0 / 2014-09-28
+1.6.2 / 2015-05-10
 ==================
 
-  * Add `208 Already Repored`
-  * Add `226 IM Used`
-  * Add `306 (Unused)`
-  * Add `415 Unable For Legal Reasons`
-  * Add `508 Loop Detected`
+  * deps: mime-types@~2.0.11
+    - Add new mime types
 
-1.1.1 / 2014-09-24
+1.6.1 / 2015-03-13
 ==================
 
-  * Add missing 308 to `codes.json`
+  * deps: mime-types@~2.0.10
+    - Add new mime types
 
-1.1.0 / 2014-09-21
+1.6.0 / 2015-02-12
 ==================
 
-  * Add `codes.json` for universal support
+  * fix false-positives in `hasBody` `Transfer-Encoding` check
+  * support wildcard for both type and subtype (`*/*`)
 
-1.0.4 / 2014-08-20
+1.5.7 / 2015-02-09
 ==================
 
-  * Package cleanup
+  * fix argument reassignment
+  * deps: mime-types@~2.0.9
+    - Add new mime types
 
-1.0.3 / 2014-06-08
+1.5.6 / 2015-01-29
 ==================
 
-  * Add 308 to `.redirect` category
+  * deps: mime-types@~2.0.8
+    - Add new mime types
 
-1.0.2 / 2014-03-13
+1.5.5 / 2014-12-30
 ==================
 
-  * Add `.retry` category
+  * deps: mime-types@~2.0.7
+    - Add new mime types
+    - Fix missing extensions
+    - Fix various invalid MIME type entries
+    - Remove example template MIME types
+    - deps: mime-db@~1.5.0
 
-1.0.1 / 2014-03-12
+1.5.4 / 2014-12-10
 ==================
 
-  * Initial release
+  * deps: mime-types@~2.0.4
+    - Add new mime types
+    - deps: mime-db@~1.3.0
+
+1.5.3 / 2014-11-09
+==================
+
+  * deps: mime-types@~2.0.3
+    - Add new mime types
+    - deps: mime-db@~1.2.0
+
+1.5.2 / 2014-09-28
+==================
+
+  * deps: mime-types@~2.0.2
+    - Add new mime types
+    - deps: mime-db@~1.1.0
+
+1.5.1 / 2014-09-07
+==================
+
+  * Support Node.js 0.6
+  * deps: media-typer@0.3.0
+  * deps: mime-types@~2.0.1
+    - Support Node.js 0.6
+
+1.5.0 / 2014-09-05
+==================
+
+ * fix `hasbody` to be true for `content-length: 0`
+
+1.4.0 / 2014-09-02
+==================
+
+ * update mime-types
+
+1.3.2 / 2014-06-24
+==================
+
+ * use `~` range on mime-types
+
+1.3.1 / 2014-06-19
+==================
+
+ * fix global variable leak
+
+1.3.0 / 2014-06-19
+==================
+
+ * improve type parsing
+
+   - invalid media type never matches
+   - media type not case-sensitive
+   - extra LWS does not affect results
+
+1.2.2 / 2014-06-19
+==================
+
+ * fix behavior on unknown type argument
+
+1.2.1 / 2014-06-03
+==================
+
+ * switch dependency from `mime` to `mime-types@1.0.0`
+
+1.2.0 / 2014-05-11
+==================
+
+ * support suffix matching:
+
+   - `+json` matches `application/vnd+json`
+   - `*/vnd+json` matches `application/vnd+json`
+   - `application/*+json` matches `application/vnd+json`
+
+1.1.0 / 2014-04-12
+==================
+
+ * add non-array values support
+ * expose internal utilities:
+
+   - `.is()`
+   - `.hasBody()`
+   - `.normalize()`
+   - `.match()`
+
+1.0.1 / 2014-03-30
+==================
+
+ * add `multipart` as a shorthand

@@ -1,59 +1,66 @@
-# ms
+# supports-color [![Build Status](https://travis-ci.org/chalk/supports-color.svg?branch=master)](https://travis-ci.org/chalk/supports-color)
 
-![CI](https://github.com/vercel/ms/workflows/CI/badge.svg)
+> Detect whether a terminal supports color
 
-Use this package to easily convert various time formats to milliseconds.
 
-## Examples
+## Install
 
-```js
-ms('2 days')  // 172800000
-ms('1d')      // 86400000
-ms('10h')     // 36000000
-ms('2.5 hrs') // 9000000
-ms('2h')      // 7200000
-ms('1m')      // 60000
-ms('5s')      // 5000
-ms('1y')      // 31557600000
-ms('100')     // 100
-ms('-3 days') // -259200000
-ms('-1h')     // -3600000
-ms('-200')    // -200
+```
+$ npm install supports-color
 ```
 
-### Convert from Milliseconds
+
+## Usage
 
 ```js
-ms(60000)             // "1m"
-ms(2 * 60000)         // "2m"
-ms(-3 * 60000)        // "-3m"
-ms(ms('10 hours'))    // "10h"
+const supportsColor = require('supports-color');
+
+if (supportsColor.stdout) {
+	console.log('Terminal stdout supports color');
+}
+
+if (supportsColor.stdout.has256) {
+	console.log('Terminal stdout supports 256 colors');
+}
+
+if (supportsColor.stderr.has16m) {
+	console.log('Terminal stderr supports 16 million colors (truecolor)');
+}
 ```
 
-### Time Format Written-Out
 
-```js
-ms(60000, { long: true })             // "1 minute"
-ms(2 * 60000, { long: true })         // "2 minutes"
-ms(-3 * 60000, { long: true })        // "-3 minutes"
-ms(ms('10 hours'), { long: true })    // "10 hours"
-```
+## API
 
-## Features
+Returns an `Object` with a `stdout` and `stderr` property for testing either streams. Each property is an `Object`, or `false` if color is not supported.
 
-- Works both in [Node.js](https://nodejs.org) and in the browser
-- If a number is supplied to `ms`, a string with a unit is returned
-- If a string that contains the number is supplied, it returns it as a number (e.g.: it returns `100` for `'100'`)
-- If you pass a string with a number and a valid unit, the number of equivalent milliseconds is returned
+The `stdout`/`stderr` objects specifies a level of support for color through a `.level` property and a corresponding flag:
 
-## Related Packages
+- `.level = 1` and `.hasBasic = true`: Basic color support (16 colors)
+- `.level = 2` and `.has256 = true`: 256 color support
+- `.level = 3` and `.has16m = true`: Truecolor support (16 million colors)
 
-- [ms.macro](https://github.com/knpwrs/ms.macro) - Run `ms` as a macro at build-time.
 
-## Caught a Bug?
+## Info
 
-1. [Fork](https://help.github.com/articles/fork-a-repo/) this repository to your own GitHub account and then [clone](https://help.github.com/articles/cloning-a-repository/) it to your local device
-2. Link the package to the global module directory: `npm link`
-3. Within the module you want to test your local development instance of ms, just link it to the dependencies: `npm link ms`. Instead of the default one from npm, Node.js will now use your clone of ms!
+It obeys the `--color` and `--no-color` CLI flags.
 
-As always, you can run the tests using: `npm test`
+Can be overridden by the user with the flags `--color` and `--no-color`. For situations where using `--color` is not possible, add the environment variable `FORCE_COLOR=1` to forcefully enable color or `FORCE_COLOR=0` to forcefully disable. The use of `FORCE_COLOR` overrides all other color support checks.
+
+Explicit 256/Truecolor mode can be enabled using the `--color=256` and `--color=16m` flags, respectively.
+
+
+## Related
+
+- [supports-color-cli](https://github.com/chalk/supports-color-cli) - CLI for this module
+- [chalk](https://github.com/chalk/chalk) - Terminal string styling done right
+
+
+## Maintainers
+
+- [Sindre Sorhus](https://github.com/sindresorhus)
+- [Josh Junon](https://github.com/qix-)
+
+
+## License
+
+MIT
